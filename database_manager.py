@@ -16,7 +16,7 @@ class DatabaseManager:
         self.conn_str = (
             f'DRIVER={{{driver}}};' 
             f'SERVER={server};'
-            f'DATABASE={database};'
+            f'DATABASE={database};' # Conexión inicial a SAT-Nomina
             f'UID={username};'
             f'PWD={password};'
             f'Encrypt={encrypt};'
@@ -69,7 +69,8 @@ class DatabaseManager:
     
     def execute_query(self, tabla_principal, dependencia):
         """
-        Consulta SQL Server usando la lista de RFCs de una Dependencia específica (WHERE IN).
+        Consulta SQL Server usando la lista de RFCs de una Dependencia específica (WHERE IN)
+        e incluye un JOIN a la base SIGER para obtener el nombre del receptor.
         """
         if not self.conn:
             return pd.DataFrame() 
@@ -85,13 +86,17 @@ class DatabaseManager:
         # Aseguramos que cada RFC esté entre comillas simples
         rfcs_tuple = ', '.join([f"'{rfc}'" for rfc in rfcs_a_consultar])
 
-        # database_manager.py
-
-        # 3. Construir la consulta SQL
+        # 3. Construir la consulta SQL con el JOIN
         query = f"""
         SELECT
-            T1.* FROM
+            T1.*,
+            T2.NOMBRE   -- <<< Campo que extraemos de la base SIGER
+        FROM
             {tabla_principal} AS T1
+        INNER JOIN 
+            SIGER.dbo.[Catalogo RFC 2024 Personas Fisicas-Concentrado-13032025] AS T2
+        ON 
+            T1.ReceptorRFC = T2.RFC COLLATE DATABASE_DEFAULT  -- <<< SOLUCIÓN DE CONFLICTO DE INTERCALACIÓN
         WHERE
             T1.EmisorRFC IN ({rfcs_tuple});
         """
